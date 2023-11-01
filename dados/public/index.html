@@ -1,0 +1,56 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juego Multijugador</title>
+</head>
+
+<body>
+  <h1>Juego Multijugador</h1>
+  
+
+  <button onclick="rollDice()">Lanzar Dado</button>
+
+  <script>
+    const socket = new WebSocket('ws://localhost:8080');
+    const rollButton = document.getElementById('rollButton');
+
+    // Maneja los mensajes recibidos del servidor.
+    socket.onmessage = (event) => {
+      const message = event.data;
+      console.log('Mensaje recibido del servidor:', message);
+      
+      if (message === 'Ambos jugadores están conectados. Puedes lanzar el dado.') {
+        rollButton.disabled = false;
+      } else {
+        rollButton.disabled = true;
+      }
+
+      // Muestra el mensaje recibido en la interfaz gráfica.
+      console.log('Mensaje recibido del servidor:', message);
+
+      // Muestra la imagen correspondiente al resultado del dado.
+      const diceImage = document.getElementById('diceImage');
+      diceImage.src = `dado_${message}.png`; // Asegúrate de tener imágenes para los números del dado (dado_1.png, dado_2.png, etc.).
+      
+      // Muestra la cubeta de dados.
+      document.getElementById('diceContainer').style.display = 'block';
+    };
+
+    // Función para lanzar el dado.
+    function rollDice() {
+      // Oculta el botón de lanzar dado y muestra el contenedor del dado.
+      document.getElementById('diceContainer').style.display = 'block';
+      
+      // Envía un mensaje al servidor para indicar que el jugador ha lanzado el dado.
+      socket.send('lanzar_dado');
+    }
+  </script>
+
+</body>
+
+</html>
+
