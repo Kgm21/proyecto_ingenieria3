@@ -1,77 +1,59 @@
-var express = require('express');
-var app = express();
-var server = require('http').Server(app);
-var io = require('socket.io')(server);
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
 
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
-let players = [];
-let diceResults = {};
-let connectedPlayers = 0;
+app.use(express.static('public'));
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
-
-
-io.on('connection', (socket) => {
-  connectedPlayers++;
-  
-  if (connectedPlayers === 1) {
-    socket.emit('message', 'Esperando al segundo jugador...');
-  } else if (connectedPlayers === 2) {
-    socket.emit('message', 'Ambos jugadores están conectados. Puedes lanzar el dado.');
-  } else {
-    socket.emit('message', 'Ya hay dos jugadores. Por favor, intenta más tarde.');
-    socket.disconnect(); // Desconectar al jugador si hay demasiados jugadores.
-    return;
+app.use(express.static('public', { 
+  setHeaders: (res, path) => {
+      if (path.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+      }
   }
+}));
 
-  players.push(socket);
+let players = {};
+let readyPlayers = 0; // Contador de jugadores listos para empezar el juego
 
+wss.on('connection', (ws) => {
+    // Asignar un identificador único al jugador
+    const playerId = Object.keys(players).length + 1;
+    players[playerId] = ws;
 
-  // Lanza el dado y almacena el resultado en el objeto diceResults.
-  diceResults[socket] = Math.floor(Math.random() * 6) + 1;
+    // Enviar mensaje al cliente con su identificador
+    ws.send(JSON.stringify({ type: 'playerId', playerId }));
 
-  // Cuando un jugador envía un mensaje, reenvía ese mensaje a todos los jugadores.
-  socket.on('message', (message) => {
-    // Implementa lógica adicional aquí si es necesario.
-  });
-
-  // Cuando un jugador se desconecta, elimínalo de la lista de jugadores.
-  socket.on('close', () => {
-    players = players.filter((player) => player !== socket);
-    delete diceResults[socket];
-  });
-});
-
-// Función para determinar al ganador y enviar el mensaje correspondiente a todos los jugadores.
-function determineWinner() {
-  const playersArray = Object.keys(diceResults);
-  if (playersArray.length === 2) {
-    const player1 = playersArray[0];
-    const player2 = playersArray[1];
-
-    const result1 = diceResults[player1];
-    const result2 = diceResults[player2];
-
-    let winner;
-    if (result1 > result2) {
-      winner = player1;
-    } else if (result1 < result2) {
-      winner = player2;
-    } else {
-      winner = 'Empate';
-    }
-
-    players.forEach((player) => {
-      player.send(`¡${winner} gana con un resultado de ${diceResults[winner]}!`);
+    // Manejar mensajes desde el cliente
+    ws.on('message', (message) => {
+        const data = JSON.parse(message);
+        if (data.type === 'ready') {
+            readyPlayers++;
+            if (readyPlayers === 2) {
+                // Cuando hay dos jugadores listos, enviar mensaje para empezar el juego
+                for (const id in players) {
+                    players[id].send(JSON.stringify({ type: 'startGame' }));
+                }
+            }
+        }
+        // Broadcasting de mensajes a otros jugadores
+        for (const id in players) {
+            if (id !== playerId && players[id].readyState === WebSocket.OPEN) {
+                players[id].send(message);
+            }
+        }
     });
-  }
-}
 
-// Llama a la función determineWinner después de un cierto período de tiempo (por ejemplo, 5 segundos).
-setTimeout(determineWinner, 5000);
+    // Eliminar jugador cuando se desconecta
+    ws.on('close', () => {
+        delete players[playerId];
+        readyPlayers = Math.max(0, readyPlayers - 1); // Decrementar el contador si un jugador se desconecta
+    });
+});
 
-server.listen(8080, function(){
-  console.log("servidor corriendo en http://localhost:8080");
+server.listen(3000, () => {
+    console.log('Servidor escuchando en el puerto 3000');
 });

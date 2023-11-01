@@ -1,56 +1,45 @@
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Juego Multijugador</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Dados</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-  <h1>Juego Multijugador</h1>
-  
+    <div id="game">
+        <div id="player-id"></div>
+        <button id="roll-dice">Tirar Dado</button>
+        <div id="result"></div>
+        
+    </div>
 
-  <button onclick="rollDice()">Lanzar Dado</button>
+    <script>
+        const playerIdElement = document.getElementById('player-id');
+        const rollDiceButton = document.getElementById('roll-dice');
+        const resultElement = document.getElementById('result');
 
-  <script>
-    const socket = new WebSocket('ws://localhost:8080');
-    const rollButton = document.getElementById('rollButton');
+        const ws = new WebSocket('ws://localhost:3000');
+        
 
-    // Maneja los mensajes recibidos del servidor.
-    socket.onmessage = (event) => {
-      const message = event.data;
-      console.log('Mensaje recibido del servidor:', message);
-      
-      if (message === 'Ambos jugadores están conectados. Puedes lanzar el dado.') {
-        rollButton.disabled = false;
-      } else {
-        rollButton.disabled = true;
-      }
-
-      // Muestra el mensaje recibido en la interfaz gráfica.
-      console.log('Mensaje recibido del servidor:', message);
-
-      // Muestra la imagen correspondiente al resultado del dado.
-      const diceImage = document.getElementById('diceImage');
-      diceImage.src = `dado_${message}.png`; // Asegúrate de tener imágenes para los números del dado (dado_1.png, dado_2.png, etc.).
-      
-      // Muestra la cubeta de dados.
-      document.getElementById('diceContainer').style.display = 'block';
-    };
-
-    // Función para lanzar el dado.
-    function rollDice() {
-      // Oculta el botón de lanzar dado y muestra el contenedor del dado.
-      document.getElementById('diceContainer').style.display = 'block';
-      
-      // Envía un mensaje al servidor para indicar que el jugador ha lanzado el dado.
-      socket.send('lanzar_dado');
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+    if (data.type === 'playerId') {
+        // Cuando se recibe el ID del jugador desde el servidor
+        const playerId = data.playerId;
+        playerIdElement.textContent = `Jugador: ${playerId}`;
+    } else if (data.type === 'startGame') {
+        resultElement.textContent = '¡El juego ha comenzado!';
     }
-  </script>
+};
 
+    const readyButton = document.getElementById('ready-button');
+        readyButton.addEventListener('click', () => {
+    // Enviar mensaje al servidor cuando el jugador está listo para empezar el juego
+        ws.send(JSON.stringify({ type: 'ready' }));
+    });
+
+        
+    </script>
 </body>
-
 </html>
-
